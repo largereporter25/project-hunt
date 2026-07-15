@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local dev data — never commit DBs, caches, or secrets
+*.db
+*.sqlite
+*.sqlite3
+hunt.db
+hunt_dev.db
+.env
+.env.local
+.env.*.local
+
+# Next.js
+.next/
+out/
+node_modules/
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# Vercel
+.vercel

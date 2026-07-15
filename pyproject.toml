@@ -1,0 +1,22 @@
+[project]
+name = "project-hunt"
+version = "0.2.0"
+description = "Unified OSINT orchestration dashboard with cryptographic provenance — Vercel monorepo"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "sqlalchemy",
+    "pydantic",
+    "pydantic-settings",
+    "httpx",
+    "rfc3161-client",
+    "asn1crypto",
+    "networkx",
+    "python-dotenv",
+    "psycopg2-binary",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
