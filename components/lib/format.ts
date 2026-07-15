@@ -131,13 +131,141 @@ export function iconForTool(tool: string): LucideIcon {
       return AlertOctagon;
     case "factcheck":
       return Quote;
-    case "mca21":
-    case "nse_bse":
-      return Briefcase;
     case "indian_kanoon":
     case "ecourts":
       return Gavel;
+    case "tafcop":
+      return Phone;
+    case "myneta_adr":
+      return Briefcase;
     default:
       return FileText;
+  }
+}
+
+// Per-kind accent colors. The graph and the findings table use these to
+// make cross-source pivots visually pop. Keep the palette muted — this
+// is an analyst tool, not a marketing site.
+export function accentForKind(kind: EntityKind): {
+  text: string; // tailwind text-*
+  border: string; // tailwind border-*
+  bg: string; // tailwind bg-*
+  hex: string; // raw hex, useful for inline styles (reactflow, svg)
+} {
+  switch (kind) {
+    case "ipv4":
+    case "ipv6":
+      return {
+        text: "text-amber-300",
+        border: "border-amber-700/50",
+        bg: "bg-amber-950/30",
+        hex: "#fbbf24",
+      };
+    case "domain":
+    case "subdomain":
+      return {
+        text: "text-indigo-300",
+        border: "border-indigo-700/50",
+        bg: "bg-indigo-950/30",
+        hex: "#a5b4fc",
+      };
+    case "email":
+      return {
+        text: "text-rose-300",
+        border: "border-rose-700/50",
+        bg: "bg-rose-950/30",
+        hex: "#fda4af",
+      };
+    case "phone":
+      return {
+        text: "text-orange-300",
+        border: "border-orange-700/50",
+        bg: "bg-orange-950/30",
+        hex: "#fdba74",
+      };
+    case "person":
+      return {
+        text: "text-emerald-300",
+        border: "border-emerald-700/50",
+        bg: "bg-emerald-950/30",
+        hex: "#6ee7b7",
+      };
+    case "org":
+      return {
+        text: "text-sky-300",
+        border: "border-sky-700/50",
+        bg: "bg-sky-950/30",
+        hex: "#7dd3fc",
+      };
+    case "cert":
+      return {
+        text: "text-purple-300",
+        border: "border-purple-700/50",
+        bg: "bg-purple-950/30",
+        hex: "#d8b4fe",
+      };
+    case "asn":
+      return {
+        text: "text-cyan-300",
+        border: "border-cyan-700/50",
+        bg: "bg-cyan-950/30",
+        hex: "#67e8f9",
+      };
+    case "url":
+      return {
+        text: "text-cyan-200",
+        border: "border-cyan-800/50",
+        bg: "bg-cyan-950/20",
+        hex: "#a5f3fc",
+      };
+    case "hash":
+      return {
+        text: "text-slate-300",
+        border: "border-slate-700/60",
+        bg: "bg-slate-900/40",
+        hex: "#cbd5e1",
+      };
+    case "breach":
+      return {
+        text: "text-rose-200",
+        border: "border-rose-800/60",
+        bg: "bg-rose-950/40",
+        hex: "#fecaca",
+      };
+    case "company_registration":
+      return {
+        text: "text-yellow-300",
+        border: "border-yellow-700/50",
+        bg: "bg-yellow-950/30",
+        hex: "#fde047",
+      };
+    case "court_case":
+      return {
+        text: "text-fuchsia-300",
+        border: "border-fuchsia-700/50",
+        bg: "bg-fuchsia-950/30",
+        hex: "#f0abfc",
+      };
+    case "claim":
+      return {
+        text: "text-teal-300",
+        border: "border-teal-700/50",
+        bg: "bg-teal-950/30",
+        hex: "#5eead4",
+      };
+    case "username":
+      return {
+        text: "text-emerald-200",
+        border: "border-emerald-800/50",
+        bg: "bg-emerald-950/20",
+        hex: "#a7f3d0",
+      };
+    default:
+      return {
+        text: "text-slate-300",
+        border: "border-slate-700/60",
+        bg: "bg-slate-900/40",
+        hex: "#94a3b8",
+      };
   }
 }

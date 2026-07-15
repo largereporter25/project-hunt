@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { Search, Filter, ChevronRight } from "lucide-react";
 import { useWorkstation } from "./lib/state";
 import { api } from "./lib/api";
-import { fmtTs, iconForTool, iconForKind, shortSha } from "./lib/format";
+import { fmtTs, iconForTool, iconForKind, accentForKind, shortSha } from "./lib/format";
 import type { Finding } from "./lib/types";
 
 const PAGE_SIZE = 200;
@@ -104,10 +104,11 @@ export function FindingsTable() {
               {paged.map((f) => {
                 const ToolIcon = iconForTool(f.source_tool);
                 const KindIcon = iconForKind(f.entity_kind);
+                const accent = accentForKind(f.entity_kind);
                 return (
                   <tr
                     key={f.id}
-                    className="hunt-row cursor-pointer"
+                    className={`hunt-row cursor-pointer border-l-2 ${accent.border}`}
                     onClick={async () => {
                       // Open the inspector for this finding's evidence.
                       try {
@@ -129,7 +130,7 @@ export function FindingsTable() {
                         {f.source_tool}
                       </span>
                     </td>
-                    <td className="px-2 py-1 text-slate-400">
+                    <td className={`px-2 py-1 ${accent.text}`}>
                       <span className="inline-flex items-center gap-1">
                         <KindIcon className="w-3 h-3" strokeWidth={1.5} />
                         {f.entity_kind}

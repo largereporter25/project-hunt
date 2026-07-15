@@ -37,6 +37,9 @@ import { api } from "../components/lib/api";
 import { fmtTs, shortSha } from "../components/lib/format";
 import { ShieldCheck, Hash, Network, Database, Activity } from "lucide-react";
 import { useMemo } from "react";
+import { RecentInvestigations } from "../components/RecentInvestigations";
+import { ExportButton } from "../components/ExportButton";
+import { KeyboardShortcuts } from "../components/KeyboardShortcuts";
 
 function TopBar() {
   const ws = useWorkstation();
@@ -87,6 +90,8 @@ function TopBar() {
         </span>
         <span className="text-slate-600">·</span>
         <span className="text-slate-500">EPOCH {epoch}</span>
+        <span className="text-slate-700">|</span>
+        <ExportButton />
       </span>
     </div>
   );
@@ -99,6 +104,7 @@ function Workstation() {
       <CommandBar />
       <AiPivot />
       <div className="flex-1 flex min-h-0">
+        <RecentInvestigations />
         {/* Left column: findings table */}
         <div className="w-[480px] min-w-[360px] max-w-[40vw] border-r border-slate-800">
           <FindingsTable />
@@ -110,6 +116,7 @@ function Workstation() {
         {/* Right: evidence vault inspector */}
         <EvidenceInspector />
       </div>
+      <KeyboardShortcuts />
     </div>
   );
 }

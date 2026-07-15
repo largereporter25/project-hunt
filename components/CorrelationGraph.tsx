@@ -25,7 +25,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { useWorkstation } from "./lib/state";
-import { iconForKind, iconForTool } from "./lib/format";
+import { iconForKind, iconForTool, accentForKind } from "./lib/format";
 import type { GraphNode as GNode, GraphEdge as GEdge } from "./lib/types";
 
 // Pre-build a Lucide icon -> React component map for node renderers.
@@ -34,14 +34,18 @@ import * as Lucide from "lucide-react";
 function NodeBody({ node }: { node: GNode }) {
   const Icon = iconForKind(node.kind);
   const seen = (node.seen_by || []).slice(0, 4);
+  const accent = accentForKind(node.kind);
   return (
     <div
       className="hunt-panel px-2 py-1.5 min-w-[160px] max-w-[260px]"
-      style={{ borderColor: "#1e293b" }}
+      style={{
+        borderColor: accent.hex,
+        boxShadow: `0 0 0 1px ${accent.hex}22, 0 0 8px ${accent.hex}11 inset`,
+      }}
     >
       <div className="flex items-center gap-1.5">
-        <Icon className="w-3.5 h-3.5 text-slate-400" strokeWidth={1.5} />
-        <span className="hunt-label">{node.kind}</span>
+        <Icon className={`w-3.5 h-3.5 ${accent.text}`} strokeWidth={1.5} />
+        <span className={`hunt-label ${accent.text}`}>{node.kind}</span>
         {seen.length > 0 && (
           <span className="ml-auto hunt-label text-slate-600">
             {seen.length} src

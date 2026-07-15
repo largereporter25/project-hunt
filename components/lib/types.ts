@@ -24,32 +24,29 @@ export type EntityKind =
   | "claim";
 
 export type SourceTool =
-  | "spiderfoot"
-  | "shodan"
-  | "theharvester"
-  | "hibp"
-  | "whois"
   | "dns"
-  | "wayback_cdx"
-  | "virustotal"
+  | "whois"
   | "crt_sh"
-  | "securitytrails"
-  | "greynoise"
+  | "wayback_cdx"
   | "ipinfo"
-  | "maltego"
   | "factcheck"
-  | "mca21"
-  | "nse_bse"
-  | "myneta_adr"
+  | "shodan"
+  | "virustotal"
+  | "hibp"
+  | "greynoise"
+  | "securitytrails"
+  | "maltego"
   | "indian_kanoon"
   | "ecourts"
   | "tafcop"
-  | "truecaller"
-  | "rti_online";
+  | "myneta_adr";
 
 export interface LineageRef {
   evidence_id: string;
   payload_sha256: string;
+  tsa_authority?: string | null;
+  tsa_stamped_at?: string | null;
+  tsa_trusted?: boolean;
 }
 
 export interface Finding {
@@ -66,14 +63,36 @@ export interface ModuleInfo {
   name: SourceTool;
   accepts: string[];
   emits: EntityKind[];
+  key_required: boolean;
+  docs_url?: string | null;
+  description: string;
 }
 
 export interface HuntResponse {
+  investigation_id: string;
   target: string;
   kind: string | null;
   findings: Finding[];
   modules_run: string[];
+  modules_skipped: string[];
   module_errors: Record<string, string>;
+  duration_ms: number;
+}
+
+export interface InvestigationSummary {
+  id: string;
+  target: string;
+  kind: string | null;
+  finding_count: number;
+  edge_count: number;
+  duration_ms: number;
+  created_at: string;
+}
+
+export interface InvestigationDetail extends InvestigationSummary {
+  modules_run: string[];
+  modules_skipped: string[];
+  findings: Finding[];
 }
 
 export interface GraphNode {
@@ -120,6 +139,7 @@ export interface EvidenceRecord {
   payload_sha256: string;
   tsa_authority: string | null;
   tsa_stamped_at: string | null;
+  tsa_trusted: boolean;
   created_at: string;
   lineage_valid?: boolean;
   data_bleed_flags?: DataBleedFlag[];
@@ -130,7 +150,9 @@ export interface EvidenceRecord {
 }
 
 export interface Stats {
+  investigation_count: number;
   evidence_count: number;
   finding_count: number;
   edge_count: number;
+  entity_count: number;
 }

@@ -19,6 +19,8 @@ import type {
   Finding,
   GraphSnapshot,
   HuntResponse,
+  InvestigationSummary,
+  InvestigationDetail,
   ModuleInfo,
   Stats,
 } from "./types";
@@ -65,6 +67,10 @@ export const api = {
       body: JSON.stringify(body),
     }),
   findings: (limit = 200) => request<Finding[]>(`/findings?limit=${limit}`),
+  investigations: (limit = 20) =>
+    request<InvestigationSummary[]>(`/investigations?limit=${limit}`),
+  investigation: (id: string) =>
+    request<InvestigationDetail>(`/investigations/${id}`),
   graph: () => request<GraphSnapshot>(`/graph`),
   vault: (evidenceId: string, includePayload = true) =>
     request<EvidenceRecord>(
@@ -77,4 +83,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  exportUrl: (investigationId?: string) =>
+    investigationId
+      ? `${BASE}/export?investigation_id=${encodeURIComponent(investigationId)}`
+      : `${BASE}/export`,
 };

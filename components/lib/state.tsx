@@ -27,6 +27,7 @@ import type {
   GraphEdge,
   GraphNode,
   GraphSnapshot,
+  InvestigationSummary,
   ModuleInfo,
   Stats,
 } from "./types";
@@ -67,6 +68,10 @@ export interface WorkstationState {
   moduleLoadError: string | null;
   modulesFromFallback: boolean;
 
+  // recent hunts (populated from /api/v1/investigations)
+  recentInvestigations: InvestigationSummary[];
+  refreshRecentInvestigations: () => Promise<void>;
+
   // mutators
   setTarget: (t: string) => void;
   setKind: (k: string | null) => void;
@@ -83,35 +88,148 @@ export interface WorkstationState {
 const Ctx = createContext<WorkstationState | null>(null);
 
 const INITIAL_GRAPH: GraphSnapshot = { nodes: [], edges: [] };
-const INITIAL_STATS: Stats = { evidence_count: 0, finding_count: 0, edge_count: 0 };
+const INITIAL_STATS: Stats = {
+  investigation_count: 0,
+  evidence_count: 0,
+  finding_count: 0,
+  edge_count: 0,
+  entity_count: 0,
+};
 
 // Hard-coded fallback catalogue. If the live /api/v1/modules call
 // fails twice, the dashboard installs this so the user can still type a
-// target and click RUN HUNT. The list mirrors api/core/hunt/main.py
-// `_TOOL_CLASSES` exactly (22 entries, 1:1).
+// target and click RUN HUNT. The list mirrors api/core/hunt/ingestion/
+// registry.py TOOL_CATALOGUE exactly. Every entry below must exist in
+// the backend; otherwise clicking the chip would silently no-op.
 const FALLBACK_CATALOGUE: ModuleInfo[] = [
-  { name: "shodan",         accepts: ["domain", "ipv4", "ipv6"], emits: ["asn", "ipv4", "org", "url"] },
-  { name: "whois",          accepts: ["domain", "email", "ipv4", "ipv6"], emits: ["asn", "domain", "email", "org", "person"] },
-  { name: "dns",            accepts: ["domain"], emits: ["ipv4", "ipv6", "subdomain"] },
-  { name: "hibp",           accepts: ["email"], emits: ["breach", "email"] },
-  { name: "crt_sh",         accepts: ["domain"], emits: ["cert", "org", "subdomain"] },
-  { name: "wayback_cdx",    accepts: ["domain", "url"], emits: ["url"] },
-  { name: "virustotal",     accepts: ["domain", "hash", "ipv4", "url"], emits: ["domain", "hash", "url"] },
-  { name: "greynoise",      accepts: ["ipv4"], emits: ["ipv4"] },
-  { name: "ipinfo",         accepts: ["ipv4", "ipv6"], emits: ["asn", "ipv4", "org"] },
-  { name: "spiderfoot",     accepts: ["domain", "email", "ipv4", "phone", "username"], emits: ["domain", "email", "ipv4", "person"] },
-  { name: "theharvester",   accepts: ["domain"], emits: ["email", "ipv4", "person", "subdomain"] },
-  { name: "securitytrails", accepts: ["domain"], emits: ["domain", "ipv4"] },
-  { name: "maltego",        accepts: ["domain", "email", "ipv4", "person"], emits: ["domain", "email", "org", "person"] },
-  { name: "factcheck",      accepts: ["claim", "domain"], emits: ["claim", "url"] },
-  { name: "mca21",          accepts: ["company_registration"], emits: ["company_registration", "org", "person"] },
-  { name: "nse_bse",        accepts: ["company_registration", "org"], emits: ["company_registration", "org"] },
-  { name: "myneta_adr",     accepts: ["org", "person"], emits: ["org", "person"] },
-  { name: "indian_kanoon",  accepts: ["court_case", "org", "person"], emits: ["court_case", "person"] },
-  { name: "ecourts",        accepts: ["court_case", "person"], emits: ["court_case"] },
-  { name: "tafcop",         accepts: ["phone"], emits: ["person", "phone"] },
-  { name: "truecaller",     accepts: ["phone"], emits: ["person", "phone"] },
-  { name: "rti_online",     accepts: ["org", "person"], emits: ["org", "person"] },
+  // --- Free, no-key tools (always run) ---------------------------------
+  {
+    name: "dns",
+    accepts: ["domain"],
+    emits: ["ipv4", "ipv6", "subdomain"],
+    key_required: false,
+    description: "Resolves A/AAAA records via the system resolver.",
+  },
+  {
+    name: "whois",
+    accepts: ["domain"],
+    emits: ["domain", "email", "org", "person"],
+    key_required: false,
+    description: "RDAP/WHOIS registrant + registrar + email extraction.",
+  },
+  {
+    name: "crt_sh",
+    accepts: ["domain"],
+    emits: ["cert", "org", "subdomain"],
+    key_required: false,
+    docs_url: "https://crt.sh/",
+    description: "Certificate Transparency log search via crt.sh.",
+  },
+  {
+    name: "wayback_cdx",
+    accepts: ["domain", "url"],
+    emits: ["url"],
+    key_required: false,
+    docs_url: "https://web.archive.org/cdx/",
+    description: "Archive.org Wayback CDX — historic URL snapshots.",
+  },
+  {
+    name: "ipinfo",
+    accepts: ["ipv4", "ipv6", "domain"],
+    emits: ["asn", "ipv4", "org"],
+    key_required: false,
+    docs_url: "https://ipinfo.io/developers",
+    description: "IPinfo — IP geolocation, ASN, and organization.",
+  },
+  {
+    name: "indian_kanoon",
+    accepts: ["person", "org", "court_case"],
+    emits: ["court_case", "person"],
+    key_required: false,
+    docs_url: "https://indiankanoon.org/",
+    description: "Indian Kanoon — Indian court case search.",
+  },
+  {
+    name: "ecourts",
+    accepts: ["court_case", "person"],
+    emits: ["court_case"],
+    key_required: false,
+    docs_url: "https://services.ecourts.gov.in/",
+    description: "eCourts — Indian district court case status.",
+  },
+  {
+    name: "tafcop",
+    accepts: ["phone"],
+    emits: ["person", "phone"],
+    key_required: false,
+    docs_url: "https://tafcop.dgtelecom.gov.in/",
+    description: "TAFCOP — DoT mobile number connection audit.",
+  },
+  {
+    name: "myneta_adr",
+    accepts: ["org", "person"],
+    emits: ["org", "person"],
+    key_required: false,
+    docs_url: "https://www.myneta.info/",
+    description: "MyNeta / ADR — political donation disclosures.",
+  },
+  // --- Key-required tools (rendered as "key required" until enabled) --
+  {
+    name: "factcheck",
+    accepts: ["claim", "domain"],
+    emits: ["claim", "url"],
+    key_required: true,
+    docs_url: "https://developers.google.com/fact-check/tools/api",
+    description: "Google Fact Check Tools — claim verification search.",
+  },
+  {
+    name: "shodan",
+    accepts: ["domain", "ipv4", "ipv6"],
+    emits: ["asn", "ipv4", "org", "url"],
+    key_required: true,
+    docs_url: "https://developer.shodan.io/api",
+    description: "Shodan — internet-wide host scanning & banners.",
+  },
+  {
+    name: "virustotal",
+    accepts: ["domain", "hash", "ipv4", "url"],
+    emits: ["domain", "hash", "url"],
+    key_required: true,
+    docs_url: "https://docs.virustotal.com/",
+    description: "VirusTotal — file/URL/domain reputation.",
+  },
+  {
+    name: "hibp",
+    accepts: ["email"],
+    emits: ["breach", "email"],
+    key_required: true,
+    docs_url: "https://haveibeenpwned.com/API/v3",
+    description: "HaveIBeenPwned — email breach exposure.",
+  },
+  {
+    name: "greynoise",
+    accepts: ["ipv4"],
+    emits: ["ipv4"],
+    key_required: true,
+    docs_url: "https://docs.greynoise.io/",
+    description: "GreyNoise — internet scanner/benign classification.",
+  },
+  {
+    name: "securitytrails",
+    accepts: ["domain"],
+    emits: ["domain", "ipv4"],
+    key_required: true,
+    docs_url: "https://docs.securitytrails.com/",
+    description: "SecurityTrails — historical DNS + subdomain enumeration.",
+  },
+  {
+    name: "maltego",
+    accepts: ["domain", "email", "ipv4", "person"],
+    emits: ["domain", "email", "org", "person"],
+    key_required: true,
+    docs_url: "https://docs.maltego.com/",
+    description: "Maltego transform hub — commercial OSINT transforms.",
+  },
 ];
 
 function _defaultEnabledFor(catalogue: ModuleInfo[]): Set<string> {
@@ -155,6 +273,7 @@ export function WorkstationProvider({ children }: { children: React.ReactNode })
   const [modulesRun, setModulesRun] = useState<string[]>([]);
   const [moduleErrors, setModuleErrors] = useState<Record<string, string>>({});
   const [lastError, setLastError] = useState<string | null>(null);
+  const [recentInvestigations, setRecentInvestigations] = useState<InvestigationSummary[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -235,10 +354,20 @@ export function WorkstationProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
+  const refreshRecentInvestigations = useCallback(async () => {
+    try {
+      const r = await api.investigations(20);
+      setRecentInvestigations(r);
+    } catch (e) {
+      console.warn("investigations refresh failed", e);
+    }
+  }, []);
+
   useEffect(() => {
     refreshGraph();
     refreshStats();
-  }, [refreshGraph, refreshStats]);
+    refreshRecentInvestigations();
+  }, [refreshGraph, refreshStats, refreshRecentInvestigations]);
 
   // --- selection --------------------------------------------------------
 
@@ -334,6 +463,7 @@ export function WorkstationProvider({ children }: { children: React.ReactNode })
       logStage("persisting");
       await refreshGraph();
       await refreshStats();
+      await refreshRecentInvestigations();
       logStage("done", `+${Date.now() - started}ms`);
     } catch (e) {
       logStage("error", String(e));
@@ -359,6 +489,7 @@ export function WorkstationProvider({ children }: { children: React.ReactNode })
       lastError,
       moduleLoadError,
       modulesFromFallback,
+      recentInvestigations,
       setTarget,
       setKind,
       toggleModule,
@@ -368,6 +499,7 @@ export function WorkstationProvider({ children }: { children: React.ReactNode })
       runHunt,
       refreshGraph,
       refreshStats,
+      refreshRecentInvestigations,
       retryLoadModules: loadModules,
     }),
     [
@@ -387,6 +519,7 @@ export function WorkstationProvider({ children }: { children: React.ReactNode })
       lastError,
       moduleLoadError,
       modulesFromFallback,
+      recentInvestigations,
       toggleModule,
       setAllModules,
       select,
@@ -394,6 +527,7 @@ export function WorkstationProvider({ children }: { children: React.ReactNode })
       runHunt,
       refreshGraph,
       refreshStats,
+      refreshRecentInvestigations,
       loadModules,
     ]
   );

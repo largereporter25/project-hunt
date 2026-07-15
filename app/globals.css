@@ -32,6 +32,24 @@ body {
   color: #e0e7ff;
 }
 
+/* Subtle background grid for the workstation canvas. Visible only on
+   the main graph/table area; 1px lines every 24px, 4% opacity. */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Slow pulse for skeleton/loading blocks. */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 2.4s ease-in-out infinite;
+}
+
 /* No focus rings as glow — give every focusable element a 1px outline. */
 :focus-visible {
   outline: 1px solid #475569; /* slate-600 */
