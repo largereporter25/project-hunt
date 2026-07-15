@@ -1,5 +1,5 @@
 /**
- * Thin API client for the Project HUNT serverless backend.
+ * Thin API client for the Project HUNT backend.
  *
  *   /api/v1/hunt          — POST  investigate a target
  *   /api/v1/findings      — GET   recent findings
@@ -9,9 +9,14 @@
  *   /api/v1/modules       — GET   list of OSINT modules
  *   /api/v1/stats         — GET   aggregate counters
  *
- * The Next.js rewrite rule in next.config.js forwards every /api/* request
- * to the Python serverless function, so the browser always sees a same-
- * origin path. In dev, that target is http://localhost:8000.
+ * The browser reads the backend base URL from the build-time env var
+ * ``NEXT_PUBLIC_API_URL``. In production (Vercel), set that to your
+ * Railway/Render backend URL. In dev, leave it unset and the client
+ * falls back to http://localhost:8000 so the local FastAPI process
+ * still works without any env file.
+ *
+ * Next.js inlines ``NEXT_PUBLIC_*`` at build time, so this constant
+ * is a plain string in the browser bundle.
  */
 
 import type {
@@ -25,7 +30,14 @@ import type {
   Stats,
 } from "./types";
 
-const BASE = "/api/v1";
+const RAW_BASE =
+  typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL
+    ? process.env.NEXT_PUBLIC_API_URL
+    : "http://localhost:8000";
+
+// Strip any trailing slash so concatenation is unambiguous, then
+// append the versioned API prefix exactly once.
+const BASE = `${RAW_BASE.replace(/\/+$/, "")}/api/v1`;
 
 async function request<T>(
   path: string,

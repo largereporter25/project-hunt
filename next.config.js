@@ -1,22 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // The Next.js dev server proxies /api/* to the Python serverless handler
-  // running locally on :8000. In production, Vercel's routing layer (see
-  // vercel.json) takes care of this automatically.
-  async rewrites() {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${apiBase}/api/:path*`,
-      },
-      {
-        source: "/healthz",
-        destination: `${apiBase}/healthz`,
-      },
-    ];
-  },
+  // The frontend is a pure static/SSR app on Vercel. The browser
+  // calls the FastAPI backend directly, using the absolute URL baked
+  // in at build time from NEXT_PUBLIC_API_URL (see components/lib/api.ts).
+  // The backend is deployed separately — Railway or Render — because
+  // Vercel serverless functions can't host the stateful SQLite/Postgres
+  // pipeline this backend needs.
 };
 
 module.exports = nextConfig;

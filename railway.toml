@@ -1,0 +1,28 @@
+# Railway deployment config for the Project HUNT FastAPI backend.
+#
+# The deployment is split: the Next.js frontend lives on Vercel, and
+# this long-running Python service lives on Railway. Vercel serverless
+# functions can't host the stateful SQLite/Postgres + ThreadPoolExecutor
+# pipeline that hunts rely on.
+#
+# Required Railway env vars (set in the service's "Variables" tab):
+#   DATABASE_URL   postgresql+psycopg2://USER:PASS@HOST:5432/DBNAME
+#                  (use Railway's Postgres plugin, or a free Neon URL)
+# Optional (all default to off / graceful degradation):
+#   APP_ENV        "production"
+#   LOG_LEVEL      "INFO"
+#   GEMINI_API_KEY, FACTCHECKTOOLS_API_KEY, IPINFO_API_KEY, ...
+#
+# Railway auto-injects $PORT; we bind to it.
+
+[build]
+# Nixpacks auto-detects Python + requirements.txt. No Dockerfile
+# needed; this config is enough to make the build deterministic.
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "uvicorn hunt.main:app --app-dir api/core --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
