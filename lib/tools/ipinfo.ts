@@ -10,7 +10,7 @@ import { getSettings } from "../config";
 
 export class IpinfoTool extends ToolFunction {
   readonly name = "ipinfo";
-  readonly accepts = new Set(["ipv4", "ipv6", "domain"]);
+  readonly accepts = new Set(["ipv4", "ipv6", "domain", "person", "org"]);
   readonly emits = new Set(["asn", "ipv4", "org"]);
   readonly docs_url = "https://ipinfo.io/developers";
   readonly description = "IPinfo — IP geolocation, ASN, and organization.";

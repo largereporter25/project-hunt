@@ -11,7 +11,7 @@ import { ToolFunction, type FetchResult, type Finding } from "./base";
 
 export class DnsTool extends ToolFunction {
   readonly name = "dns";
-  readonly accepts = new Set(["domain"]);
+  readonly accepts = new Set(["domain", "subdomain", "person", "org"]);
   readonly emits = new Set(["ipv4", "ipv6", "subdomain"]);
   readonly description = "Resolves A/AAAA records via the system resolver.";
   readonly per_request_timeout_ms = 5_000;

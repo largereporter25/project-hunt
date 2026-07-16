@@ -44,7 +44,7 @@ interface HuntResult {
     tsa_trusted?: boolean;
   }>;
   modules_run: string[];
-  modules_skipped: string[];
+  modules_skipped: Array<{ name: string; reason: string }>;
   module_errors: Record<string, string>;
   duration_ms: number;
 }
@@ -94,27 +94,54 @@ async function runHunt(
 ): Promise<HuntResult> {
   // Decide which tools to run.
   let tools = availableTools();
+  let modulesSkipped: Array<{ name: string; reason: string }> = [];
   if (requestedModules && requestedModules.length > 0) {
     const wanted = new Set(requestedModules.map((s) => s.toLowerCase()));
-    tools = tools.filter((t) => wanted.has(t.name));
-    if (tools.length === 0) {
+    const keep = tools.filter((t) => wanted.has(t.name));
+    if (keep.length === 0) {
       throw new Error(`no_matching_modules: ${[...wanted].join(",")}`);
     }
+    modulesSkipped = tools
+      .filter((t) => !wanted.has(t.name))
+      .map((t) => ({ name: t.name, reason: "not_requested" }));
+    tools = keep;
   } else if (kind) {
     const narrowed = tools.filter((t) => t.accepts.has(kind));
-    if (narrowed.length > 0) tools = narrowed;
+    if (narrowed.length > 0) {
+      modulesSkipped = tools
+        .filter((t) => !t.accepts.has(kind))
+        .map((t) => ({ name: t.name, reason: `accepts_no_${kind}` }));
+      tools = narrowed;
+    }
   } else {
-    // Auto-infer kind from target shape.
+    // Auto-infer kind from target shape. Use the narrow set ONLY if
+    // it covers a meaningful portion of the available tools — for
+    // a person/org target, a strict narrow would drop DNS/WHOIS/
+    // crt.sh/Wayback/IPinfo, which all work fine with a free-text
+    // query. If the narrow set is < 4 tools, fall back to running
+    // all available tools (so the user sees the full attempt list).
     const k = inferKind(target);
     if (k) {
       const narrowed = tools.filter((t) => t.accepts.has(k));
-      if (narrowed.length > 0) tools = narrowed;
+      if (narrowed.length >= 4) {
+        modulesSkipped = tools
+          .filter((t) => !t.accepts.has(k))
+          .map((t) => ({ name: t.name, reason: `accepts_no_${k}` }));
+        tools = narrowed;
+      }
+      // else: keep all tools — better to try and return 0 findings
+      // than silently skip 7 of 10.
     }
   }
 
-  // Filter out key-required tools that don't have a key. (The
-  // registry already does this, but defensive against custom lists.)
+  // Drop key-required tools whose env var is missing.
+  const beforeKeyFilter = tools;
   tools = tools.filter((t) => !t.key_required || isKeyPresent(t.name));
+  for (const t of beforeKeyFilter) {
+    if (!tools.includes(t)) {
+      modulesSkipped.push({ name: t.name, reason: "key_required" });
+    }
+  }
 
   // 1) Insert investigation row up front so findings can FK to it.
   const investigationId = await withClient(async (c) => {
@@ -127,7 +154,7 @@ async function runHunt(
         target,
         kind,
         JSON.stringify(tools.map((t) => t.name)),
-        JSON.stringify([]),
+        JSON.stringify(modulesSkipped),
       ]
     );
     return r.rows[0].id as string;
@@ -190,7 +217,7 @@ async function runHunt(
       tsa_trusted: f._hunt_lineage?.tsa_trusted,
     })),
     modules_run: tools.map((t) => t.name),
-    modules_skipped: [],
+    modules_skipped: modulesSkipped,
     module_errors: moduleErrors,
     duration_ms: durationMs,
   };

@@ -9,7 +9,7 @@ import { ToolFunction, type FetchResult, type Finding } from "./base";
 
 export class CrtshTool extends ToolFunction {
   readonly name = "crt_sh";
-  readonly accepts = new Set(["domain"]);
+  readonly accepts = new Set(["domain", "person", "org"]);
   readonly emits = new Set(["cert", "org", "subdomain"]);
   readonly docs_url = "https://crt.sh/";
   readonly description = "Certificate Transparency log search via crt.sh.";

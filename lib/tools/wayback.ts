@@ -8,7 +8,7 @@ import { ToolFunction, type FetchResult, type Finding } from "./base";
 
 export class WaybackTool extends ToolFunction {
   readonly name = "wayback_cdx";
-  readonly accepts = new Set(["domain", "url"]);
+  readonly accepts = new Set(["domain", "url", "person", "org"]);
   readonly emits = new Set(["url"]);
   readonly docs_url = "https://web.archive.org/cdx/";
   readonly description = "Archive.org Wayback CDX — historic URL snapshots.";

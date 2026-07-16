@@ -10,7 +10,7 @@ import { getSettings } from "../config";
 
 export class FactCheckTool extends ToolFunction {
   readonly name = "factcheck";
-  readonly accepts = new Set(["claim", "domain"]);
+  readonly accepts = new Set(["claim", "domain", "person", "org"]);
   readonly emits = new Set(["claim", "url"]);
   readonly key_required = true;
   readonly docs_url = "https://developers.google.com/fact-check/tools/api";

@@ -13,7 +13,7 @@ const EMAIL_RE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
 
 export class WhoisTool extends ToolFunction {
   readonly name = "whois";
-  readonly accepts = new Set(["domain"]);
+  readonly accepts = new Set(["domain", "person", "org"]);
   readonly emits = new Set(["org", "email", "person", "domain"]);
   readonly description = "RDAP/WHOIS registrant + registrar + email extraction.";
   readonly per_request_timeout_ms = 10_000;

@@ -105,6 +105,7 @@ interface HuntResp {
     lineage?: { evidence_id?: string; payload_sha256?: string; tsa_trusted?: boolean; tsa_authority?: string | null };
   }>;
   modules_run: string[];
+  modules_skipped?: Array<{ name: string; reason: string }>;
   module_errors: Record<string, string>;
   duration_ms: number;
 }
@@ -245,6 +246,15 @@ function renderHunt(resp: HuntResp): string {
     lines.push("─".repeat(60));
     lines.push("ERRORS");
     for (const [k, v] of errors) lines.push(`  ${k}: ${String(v).slice(0, 100)}`);
+  }
+
+  const skipped = resp.modules_skipped ?? [];
+  if (skipped.length > 0) {
+    lines.push("─".repeat(60));
+    lines.push("SKIPPED");
+    for (const s of skipped) {
+      lines.push(`  ${s.name.padEnd(16)} ${s.reason}`);
+    }
   }
 
   lines.push("─".repeat(60));
