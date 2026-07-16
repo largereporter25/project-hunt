@@ -1,16 +1,20 @@
 "use client";
 
 /**
- * Findings table. Sits below the command bar in the left column. One
- * row per finding, with a clickable lineage chip that opens the
- * Evidence Inspector pre-loaded with the finding's evidence row.
+ * Findings table. One row per finding, with the entity kind shown
+ * as a 3-letter chip and the SHA-256 prefix beside it. Clicking a
+ * row opens the Evidence Inspector pre-loaded with that finding's
+ * evidence row.
+ *
+ * No colored left border (that was a SaaS-tell). Every row uses the
+ * same single-color border, plus a "[open]" hint at the end. The
+ * filter input is prefixed with a fixed ``filter:`` prompt.
  */
 
 import { useEffect, useState } from "react";
-import { Search, Filter, ChevronRight } from "lucide-react";
 import { useWorkstation } from "./lib/state";
 import { api } from "./lib/api";
-import { fmtTs, iconForTool, iconForKind, accentForKind, shortSha } from "./lib/format";
+import { fmtTs, iconForTool, iconForKind, kindTag, shortSha } from "./lib/format";
 import type { Finding } from "./lib/types";
 
 const PAGE_SIZE = 200;
@@ -21,12 +25,7 @@ export function FindingsTable() {
   const [toolFilter, setToolFilter] = useState<string | "">("");
   const [page, setPage] = useState(0);
   const [items, setItems] = useState<Finding[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  // Re-fetch when the most recent investigation completes; we just
-  // pull the latest 200 findings the server already returned in the
-  // hunt response, but if the user wants more history we can call the
-  // /findings endpoint.
   useEffect(() => {
     if (ws.findings.length > 0) {
       setItems(ws.findings);
@@ -53,28 +52,28 @@ export function FindingsTable() {
   const paged = filtered.slice(start, end);
 
   return (
-    <div className="flex flex-col h-full bg-slate-950">
-      <header className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-800 bg-panel-900">
-        <span className="hunt-label">FINDINGS</span>
-        <span className="font-mono text-[10px] text-slate-600">
+    <div className="flex flex-col h-full bg-bg-base">
+      <header className="flex items-center gap-2 px-3 py-1.5 border-b border-line bg-bg-panel">
+        <span className="h-label">findings</span>
+        <span className="font-mono text-[10px] text-fg-muted">
           {filtered.length}/{items.length}
         </span>
         <div className="flex-1 flex items-center gap-1 ml-2">
-          <Search className="w-3 h-3 text-slate-600" />
+          <span className="h-label shrink-0">filter:</span>
           <input
-            className="flex-1 bg-transparent border-0 text-[11px] font-mono text-slate-300 placeholder-slate-600 focus:outline-none"
-            placeholder="filter: ip, domain, email, sha…"
+            className="flex-1 bg-transparent border-0 text-[11px] font-mono text-fg placeholder-fg-muted focus:outline-none"
+            placeholder="ip, domain, email, sha…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
         </div>
-        <Filter className="w-3 h-3 text-slate-600" />
+        <span className="h-label shrink-0">tool:</span>
         <select
-          className="bg-slate-950 border border-slate-800 text-[10px] font-mono text-slate-400 px-1 py-0.5 focus:outline-none"
+          className="bg-bg-base border border-line text-[10px] font-mono text-fg-dim px-1 py-0.5 focus:outline-none"
           value={toolFilter}
           onChange={(e) => setToolFilter(e.target.value)}
         >
-          <option value="">ALL TOOLS</option>
+          <option value="">ALL</option>
           {allTools.map((t) => (
             <option key={t} value={t}>
               {t}
@@ -85,68 +84,58 @@ export function FindingsTable() {
 
       <div className="flex-1 overflow-y-auto">
         {paged.length === 0 ? (
-          <div className="p-4 font-mono text-[11px] text-slate-600">
+          <div className="p-4 font-mono text-[11px] text-fg-muted">
             no findings match the current filter.
           </div>
         ) : (
           <table className="w-full text-[11px] font-mono">
-            <thead className="sticky top-0 bg-slate-950">
-              <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
-                <th className="px-2 py-1 w-24">TOOL</th>
-                <th className="px-2 py-1 w-24">KIND</th>
-                <th className="px-2 py-1">ENTITY</th>
-                <th className="px-2 py-1 w-32">SHA-256</th>
-                <th className="px-2 py-1 w-32">OBSERVED</th>
-                <th className="px-2 py-1 w-4"></th>
+            <thead className="sticky top-0 bg-bg-base">
+              <tr className="text-left text-[10px] uppercase tracking-widest text-fg-dim border-b border-line">
+                <th className="px-2 py-1 w-24">tool</th>
+                <th className="px-2 py-1 w-16">kind</th>
+                <th className="px-2 py-1">entity</th>
+                <th className="px-2 py-1 w-32">sha-256</th>
+                <th className="px-2 py-1 w-36">observed</th>
               </tr>
             </thead>
             <tbody>
               {paged.map((f) => {
                 const ToolIcon = iconForTool(f.source_tool);
                 const KindIcon = iconForKind(f.entity_kind);
-                const accent = accentForKind(f.entity_kind);
                 return (
                   <tr
                     key={f.id}
-                    className={`hunt-row cursor-pointer border-l-2 ${accent.border}`}
+                    className="h-row cursor-pointer"
                     onClick={async () => {
-                      // Open the inspector for this finding's evidence.
                       try {
                         const ev = await api.vault(f.lineage.evidence_id, true);
                         ws.setEvidence(ev);
-                        // The drawer renders `ws.evidence` directly, so
-                        // we don't need a node/edge selection to show
-                        // the row. We still mark the selection so the
-                        // close button works as expected.
                         ws.select({ kind: "node", id: f.id });
                       } catch (e) {
                         console.warn("failed to load evidence", e);
                       }
                     }}
                   >
-                    <td className="px-2 py-1 text-slate-300">
+                    <td className="px-2 py-1 text-fg">
                       <span className="inline-flex items-center gap-1">
                         <ToolIcon className="w-3 h-3" strokeWidth={1.5} />
                         {f.source_tool}
                       </span>
                     </td>
-                    <td className={`px-2 py-1 ${accent.text}`}>
+                    <td className="px-2 py-1 text-fg">
                       <span className="inline-flex items-center gap-1">
                         <KindIcon className="w-3 h-3" strokeWidth={1.5} />
-                        {f.entity_kind}
+                        <span className="h-chip">{kindTag(f.entity_kind)}</span>
                       </span>
                     </td>
-                    <td className="px-2 py-1 text-slate-100 break-all max-w-[28ch]">
+                    <td className="px-2 py-1 text-fg break-all max-w-[28ch]">
                       {f.entity_value}
                     </td>
-                    <td className="px-2 py-1 text-slate-500">
+                    <td className="px-2 py-1 text-fg-dim">
                       {shortSha(f.lineage.payload_sha256)}
                     </td>
-                    <td className="px-2 py-1 text-slate-500">
+                    <td className="px-2 py-1 text-fg-dim">
                       {fmtTs(f.observed_at)}
-                    </td>
-                    <td className="px-2 py-1 text-slate-600">
-                      <ChevronRight className="w-3 h-3" />
                     </td>
                   </tr>
                 );
@@ -157,19 +146,19 @@ export function FindingsTable() {
       </div>
 
       {filtered.length > PAGE_SIZE && (
-        <footer className="flex items-center gap-2 px-3 py-1 border-t border-slate-800 bg-panel-900 font-mono text-[10px] text-slate-500">
+        <footer className="flex items-center gap-2 px-3 py-1 border-t border-line bg-bg-panel font-mono text-[10px] text-fg-dim">
           <button
-            className="hunt-chip"
+            className="h-chip"
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0}
           >
-            ‹ PREV
+            ‹ prev
           </button>
           <span>
             page {page + 1} / {Math.ceil(filtered.length / PAGE_SIZE)}
           </span>
           <button
-            className="hunt-chip"
+            className="h-chip"
             onClick={() =>
               setPage((p) =>
                 Math.min(Math.ceil(filtered.length / PAGE_SIZE) - 1, p + 1)
@@ -177,7 +166,7 @@ export function FindingsTable() {
             }
             disabled={end >= filtered.length}
           >
-            NEXT ›
+            next ›
           </button>
         </footer>
       )}

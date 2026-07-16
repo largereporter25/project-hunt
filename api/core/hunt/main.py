@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session
 
 from hunt.config import get_settings
 from hunt.correlation import CorrelationEngine, default_rules
-from hunt.db import get_db, get_sync_engine
+from hunt.db import DatabaseNotConfigured, get_db, get_sync_engine
 from hunt.ingestion.registry import available_tools, catalogue_metadata
 from hunt.ingestion.runner import ParallelRunner
 from hunt.models import (
@@ -72,8 +72,18 @@ logging.basicConfig(level=get_settings().log_level)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Idempotent schema bootstrap. Cheap on every cold start.
+    # On Vercel without DATABASE_URL we want a clear 503 with a
+    # human-readable message rather than a 500 stack trace.
     try:
         Base.metadata.create_all(bind=get_sync_engine())
+    except DatabaseNotConfigured as exc:
+        # Persist the message so the exception handler can return
+        # it as a JSON body — a stack trace would only confuse the
+        # operator who just needs to set the env var.
+        app.state.startup_error = str(exc)
+        log.error("startup aborted: %s", exc)
+        yield
+        return
     except Exception as exc:  # noqa: BLE001
         log.warning("schema create_all failed: %s", exc)
     _ = get_settings()
@@ -105,8 +115,40 @@ def create_app() -> FastAPI:
         allow_credentials=False,
     )
 
+    @app.middleware("http")
+    async def _check_startup(request, call_next):
+        # If the lifespan refused to bring up the database (e.g. Vercel
+        # without DATABASE_URL), every request gets a clear 503 with
+        # the explanation, instead of a 500 from the get_db() dep.
+        err = getattr(app.state, "startup_error", None)
+        if err and request.url.path != "/healthz":
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "database_not_configured",
+                    "detail": err,
+                },
+            )
+        return await call_next(request)
+
     @app.get("/healthz")
     def healthz() -> dict:
+        err = getattr(app.state, "startup_error", None)
+        if err:
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "misconfigured",
+                    "app": "hunt",
+                    "version": "0.2.0",
+                    "error": "database_not_configured",
+                    "detail": err,
+                },
+            )
         return {"status": "ok", "app": "hunt", "version": "0.2.0"}
 
     # -- /api/v1/modules ---------------------------------------------------

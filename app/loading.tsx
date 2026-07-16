@@ -1,25 +1,21 @@
 /**
- * Loading screen for the Next.js app router. Renders while the
- * workstation page chunk is being fetched.
+ * Boot screen — while the workstation page chunk is being fetched.
  *
- * The animation is intentionally subtle: a single 1px line that
- * "writes" across the bottom of the header, no spinning logos.
+ * Pure ASCII. No spinner, no gradient bar, no logo. A blinking
+ * caret is the only motion.
  */
-
-import { Loader2 } from "lucide-react";
-
 export default function Loading() {
   return (
-    <div className="h-screen w-screen bg-slate-950 text-slate-300 font-mono antialiased flex items-center justify-center">
-      <div className="text-center max-w-md px-6">
-        <div className="hunt-label mb-3">PROJECT HUNT · BOOT</div>
-        <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          loading workstation…
+    <div className="h-screen w-screen bg-bg-base text-fg font-mono flex items-center justify-center">
+      <div className="max-w-md w-full px-6">
+        <div className="h-label mb-3">project hunt // boot</div>
+        <div className="text-xs text-fg-dim">
+          loading workstation
+          <span className="hunt-blink">_</span>
         </div>
-        <div className="mt-6 h-px bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent animate-pulse" />
-        <div className="mt-6 text-[10px] text-slate-600">
-          cryptographic provenance · cross-source correlation · chain of custody
+        <div className="mt-6 h-px bg-line hunt-step" />
+        <div className="mt-6 text-[10px] text-fg-muted uppercase tracking-widest">
+          sha-256 · rfc3161 · chain of custody
         </div>
       </div>
     </div>

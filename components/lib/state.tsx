@@ -67,7 +67,6 @@ export interface WorkstationState {
   // a stale 500 from the modules fetch never taints the run pipeline.
   moduleLoadError: string | null;
   modulesFromFallback: boolean;
-
   // recent hunts (populated from /api/v1/investigations)
   recentInvestigations: InvestigationSummary[];
   refreshRecentInvestigations: () => Promise<void>;

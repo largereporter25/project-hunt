@@ -3,7 +3,8 @@
 > A unified **OSINT investigation dashboard** with cryptographic
 > chain-of-custody. Free, no-API-key tools out of the box; paid
 > modules render as "configure a key to enable" placeholders.
-> Deploys to Vercel as a single monorepo.
+> **Deploys to Vercel as a single monorepo** — frontend + FastAPI
+> backend + Postgres in one project.
 
 Project HUNT lets an analyst type a target (a domain, an IP, an email,
 a phone, a person) and run it through every OSINT module at once.
@@ -19,37 +20,36 @@ through.
 
 The free tier is fully functional with no API keys configured.
 
-## Quick start
+## Quick start (local dev)
 
 ```bash
-# Backend
-python -m venv .venv && . .venv/bin/activate   # or: py -m venv .venv
+# Backend (SQLite by default — no DATABASE_URL needed)
+python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 uvicorn hunt.main:app --app-dir api/core --reload --port 8000
 
 # Frontend (separate terminal)
 npm install
-npm run dev
+NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 ```
 
 Open <http://localhost:3000>, type a target, hit Enter. The browser
-calls the backend at `http://localhost:8000/api/v1/*` directly — the
-Vercel rewrite proxy that earlier versions used is gone.
+calls `http://localhost:8000/api/v1/*` directly (CORS is wide-open in
+dev), the FastAPI handler runs the tools, hashes the payloads, and
+returns the findings.
 
-## Architecture
+## Architecture (single-deployment Vercel)
 
-The deployment is **split**:
+| Component | Where it lives | Why |
+| --- | --- | --- |
+| Frontend | Vercel (`/`)        | Next.js static + SSR, edge CDN, free hosting |
+| Backend  | Vercel (`/api/*`)   | `@vercel/python` serverless function, no state, free up to 100 GB-s |
+| Database | Neon / Supabase / Vercel Postgres | Persistent across deploys. SQLite works in dev only — serverless invocations cannot write to a shared FS. |
 
-| Component  | Where it lives                | Why                                              |
-| ---------- | ----------------------------- | ------------------------------------------------ |
-| Frontend   | Vercel (static + SSR)         | Edge CDN, no state, free hosting                 |
-| Backend    | Railway / Render (long-lived) | uvicorn process, real Postgres, RFC 3161 timing  |
-| Database   | Railway Postgres **or** Neon  | Persistent across deploys; SQLite works in dev    |
-
-The frontend's API client (`components/lib/api.ts`) reads the
-backend URL from the build-time env var `NEXT_PUBLIC_API_URL`. CORS
-on the backend allows all origins (`allow_origins=["*"]`), so the
-cross-origin browser call works without any further configuration.
+The frontend's API client (`components/lib/api.ts`) calls `/api/v1/*`
+on the **same origin**. Vercel routes that prefix to
+`api/index.py` (a thin wrapper around the FastAPI app). No CORS,
+no proxy, no Railway.
 
 ## Free, no-API-key modules
 
@@ -76,7 +76,7 @@ backfill the structured fields. The URL is in the finding's
 
 These are real implementations that activate the moment their env
 var is set. Without a key, the dashboard shows them in the catalogue
-with a **"key required"** chip and a link to the docs page.
+with a `"key required"` chip and a link to the docs page.
 
 | Module        | Env var               | Docs                                                |
 | ------------- | --------------------- | --------------------------------------------------- |
@@ -96,7 +96,7 @@ The app boots and serves traffic with no keys at all.
 
 | Method | Path                              | Purpose                          |
 | ------ | --------------------------------- | -------------------------------- |
-| GET    | `/healthz`                        | liveness probe                   |
+| GET    | `/healthz`                        | liveness probe (503 if misconfigured) |
 | GET    | `/api/v1/modules`                 | static tool catalogue            |
 | POST   | `/api/v1/hunt`                    | run an investigation             |
 | GET    | `/api/v1/investigations`          | recent hunts (sidebar)           |
@@ -106,85 +106,102 @@ The app boots and serves traffic with no keys at all.
 | GET    | `/api/v1/vault/{evidence_id}`     | evidence record (+ raw payload)  |
 | GET    | `/api/v1/vault`                   | recent evidence records          |
 | GET    | `/api/v1/stats`                   | aggregate counters               |
-| POST   | `/api/v1/summarize`               | optional Gemini pivot hint       |
+| POST   | `/api/v1/summarize`               | optional pivot-suggestion hint   |
 | GET    | `/api/v1/export`                  | JSON evidence bundle             |
 
-## Deploying the split stack
+## Deploying to Vercel
 
-The frontend and the backend are deployed **separately**. Pick a
-backend host (Railway is documented below; Render works the same
-way), then point the Vercel frontend at it.
+You need **two things**: a Vercel project, and a hosted Postgres
+URL. Neon and Supabase both offer a free tier that's more than
+enough.
 
-### 1. Deploy the backend to Railway
+### 1. Provision a Postgres database
 
-1. Sign in to <https://railway.app> with your GitHub account.
-2. **New Project → Deploy from GitHub repo** → pick
-   `largereporter25/project-hunt` (the same repo as the frontend).
-3. In the service settings:
-   - **Root Directory** → leave blank (Nixpacks will detect Python
-     from `runtime.txt` and `requirements.txt`).
-   - **Start Command** → Railway will read it from
-     `railway.toml`. If it doesn't, set it manually to:
-     `uvicorn hunt.main:app --app-dir api/core --host 0.0.0.0 --port $PORT`
-4. **Add a database** → click "+ New" → "Database" → "Postgres".
-   Railway provisions a Postgres instance and exposes its URL as
-   the `DATABASE_URL` env var on your service. The
-   `postgresql://…` URL that Railway gives you works as-is because
-   SQLAlchemy accepts the bare `postgresql://` scheme and falls back
-   to psycopg2.
-5. Wait for the deploy to finish, then copy the public URL Railway
-   generated (looks like `https://hunt-api.up.railway.app`).
-6. Smoke test: `curl https://hunt-api.up.railway.app/healthz`
-   should return `{"status":"ok","app":"hunt","version":"0.2.0"}`.
-7. Optional env vars (all blank by default; missing key = tool
-   degrades to "key required"):
-   - `GEMINI_API_KEY` — enables the AI Pivot panel
-   - `FACTCHECKTOOLS_API_KEY` — enables Fact Check tool
-   - `IPINFO_API_KEY` — raises the IPinfo free-tier limit
-   - `SHODAN_API_KEY`, `VIRUSTOTAL_API_KEY`, `HIBP_API_KEY`,
-     `GREYNOISE_API_KEY`, `SECURITYTRAILS_API_KEY`, `MALTEGO_API_KEY`
-8. Optional: provision the database on a free external Postgres
-   (Neon, Supabase) instead of the Railway plugin. Set
-   `DATABASE_URL=postgresql+psycopg2://USER:PASS@HOST/DBNAME` and
-   you're done.
+**Neon (recommended — fastest to set up):**
 
-### 2. Deploy the frontend to Vercel
+1. Sign in to <https://neon.tech> with GitHub.
+2. Click **New Project**. Pick a name, region, and the free
+   **Postgres 16** tier.
+3. After the project is created, copy the **Connection string**
+   that looks like:
+   ```
+   postgresql://USER:PASS@ep-xxxxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+   ```
+4. Append `+psycopg2` to the scheme so SQLAlchemy uses the
+   psycopg2 driver:
+   ```
+   postgresql+psycopg2://USER:PASS@ep-xxxxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+   ```
+
+**Supabase (alternative):**
+
+1. Sign in to <https://supabase.com> with GitHub.
+2. New project → pick a name, password, and region.
+3. Project Settings → Database → Connection string → **URI**.
+   Append `+psycopg2` to the scheme as above.
+
+### 2. Deploy to Vercel
 
 1. Sign in to <https://vercel.com> with your GitHub account.
 2. **Add New → Project** → import
-   `largereporter25/project-hunt` (same repo, the Vercel project
-   builds the Next.js frontend only — the Python handler in
-   `api/index.py` is no longer routed).
-3. In **Project Settings → Environment Variables**, add:
-   - `NEXT_PUBLIC_API_URL` = `https://hunt-api.up.railway.app`
-     (use the URL from step 1.5; **no trailing slash, no `/api/v1` suffix**)
-4. Click **Deploy**. Vercel builds the static/SSR frontend and
-   bakes `NEXT_PUBLIC_API_URL` into the JavaScript bundle.
+   `largereporter25/project-hunt` (the same repo as the backend).
+3. Leave all framework / build-command settings at their defaults —
+   Vercel detects Next.js automatically and adds the Python build
+   from `vercel.json`.
+4. **Project Settings → Environment Variables**, add:
+   - `DATABASE_URL` = the `postgresql+psycopg2://…` URL from step 1.
+5. Click **Deploy**. Vercel builds the Next.js frontend and the
+   Python handler together; the browser hits `/api/v1/*` on the
+   same origin.
 
 ### 3. Verify
 
 ```bash
-# 1. Backend health (Railway URL)
-curl https://hunt-api.up.railway.app/healthz
+# 1. Liveness
+curl https://<your-app>.vercel.app/healthz
 # {"status":"ok","app":"hunt","version":"0.2.0"}
 
-# 2. Modules endpoint
-curl https://hunt-api.up.railway.app/api/v1/modules | head -c 200
+# 2. Module catalogue (same origin)
+curl https://<your-app>.vercel.app/api/v1/modules | head -c 200
 
-# 3. Frontend reachable
-curl -I https://project-hunt-kdq3.vercel.app/
-
-# 4. End-to-end: open the Vercel URL in a browser, run a hunt
+# 3. End-to-end: open the Vercel URL in a browser, run a hunt
 #    against "tata.com", and watch the DevTools Network panel.
-#    Every /api/v1/* request should hit the Railway host, not
-#    the Vercel host. The browser console should be free of CORS
-#    errors.
+#    Every /api/v1/* request should hit the Vercel host (same
+#    origin as the page), not localhost.
 ```
 
-If you ever want to re-monorepo the backend (deploy Python on Vercel
-again, or to Cloud Run / Fly.io), `api/index.py` is still there as
-an ASGI entry point — you only need to add the right `vercel.json`
-or `Dockerfile`.
+If `/healthz` returns `503` with `error: "database_not_configured"`,
+the `DATABASE_URL` env var is missing or not a Postgres URL.
+
+### 4. Optional env vars (all blank by default; missing key = tool
+   degrades to "key required"):
+
+- `GEMINI_API_KEY` — enables the Pivot Suggestions panel
+- `FACTCHECKTOOLS_API_KEY` — enables Fact Check tool
+- `IPINFO_API_KEY` — raises the IPinfo free-tier limit
+- `SHODAN_API_KEY`, `VIRUSTOTAL_API_KEY`, `HIBP_API_KEY`,
+  `GREYNOISE_API_KEY`, `SECURITYTRAILS_API_KEY`, `MALTEGO_API_KEY`
+- `TSA_URLS`, `TSA_REQUIRED`, `TSA_TIMEOUT_SECONDS` — RFC 3161
+  timestamp authority chain. Default is the free public FreeTSA
+  (`https://freetsa.org/tsr,http://timestamp.digicert.com`).
+
+## Why one Vercel deployment (and not the old Railway split)?
+
+The previous version of this README recommended deploying the
+FastAPI backend to Railway and the frontend to Vercel. That
+worked but it had two failure modes that bit real users:
+
+1. If you forgot to deploy the backend, the frontend called
+   `localhost:8000` (because `NEXT_PUBLIC_API_URL` was unset)
+   and **everything looked broken**: the module catalogue
+   never loaded, every hunt returned a CORS error.
+2. If the Railway free tier put the service to sleep, the
+   first Vercel request after the sleep took 30+ seconds to
+   warm up, which the browser interpreted as "the app is dead".
+
+Both go away when the backend is a Vercel serverless function
+on the same origin: the cold-start is sub-second, the route
+always exists, and there's no second service to keep alive.
 
 ## Responsible use
 

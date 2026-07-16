@@ -3,14 +3,15 @@
 /**
  * Live entity correlation graph.
  *
- * Nodes = entities (IP, domain, email, ASN, ...). Edges = relationships
- * produced by the deterministic correlation rules in
- * ``hunt/graph/rules.py``. Cross-source edges (where the two endpoints
- * were observed by *different* tools) are drawn solid white so the
- * analyst's eye lands on them first; same-tool edges are dotted slate.
+ * Nodes = entities (IP, domain, email, ASN, …). Edges = relationships
+ * produced by the deterministic correlation rules. Cross-source edges
+ * (where the two endpoints were observed by *different* tools) are
+ * drawn in the accent color so the analyst's eye lands on them first;
+ * same-tool edges are dim slate.
  *
- * React Flow is the renderer. We override the default theme in
- * globals.css to match the forensic-terminal look.
+ * No per-kind polychrome borders (that was a SaaS-tell). Every node
+ * is 1px-accent, period. The kind is shown as a 3-letter tag chip
+ * inside the node, the way Wireshark labels a protocol column.
  */
 
 import { useCallback, useMemo } from "react";
@@ -25,47 +26,37 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { useWorkstation } from "./lib/state";
-import { iconForKind, iconForTool, accentForKind } from "./lib/format";
+import { iconForKind, iconForTool, kindTag } from "./lib/format";
 import type { GraphNode as GNode, GraphEdge as GEdge } from "./lib/types";
-
-// Pre-build a Lucide icon -> React component map for node renderers.
-import * as Lucide from "lucide-react";
 
 function NodeBody({ node }: { node: GNode }) {
   const Icon = iconForKind(node.kind);
   const seen = (node.seen_by || []).slice(0, 4);
-  const accent = accentForKind(node.kind);
   return (
-    <div
-      className="hunt-panel px-2 py-1.5 min-w-[160px] max-w-[260px]"
-      style={{
-        borderColor: accent.hex,
-        boxShadow: `0 0 0 1px ${accent.hex}22, 0 0 8px ${accent.hex}11 inset`,
-      }}
-    >
+    <div className="h-panel px-2 py-1.5 min-w-[180px] max-w-[260px] border border-accent">
       <div className="flex items-center gap-1.5">
-        <Icon className={`w-3.5 h-3.5 ${accent.text}`} strokeWidth={1.5} />
-        <span className={`hunt-label ${accent.text}`}>{node.kind}</span>
+        <Icon className="w-3.5 h-3.5 text-fg" strokeWidth={1.5} />
+        <span className="h-chip h-chip-on">{kindTag(node.kind)}</span>
         {seen.length > 0 && (
-          <span className="ml-auto hunt-label text-slate-600">
+          <span className="ml-auto h-label text-fg-muted">
             {seen.length} src
           </span>
         )}
       </div>
       <div
-        className="font-mono text-[11px] text-slate-200 break-all leading-tight mt-0.5"
+        className="font-mono text-[11px] text-fg break-all leading-tight mt-0.5"
         title={node.value}
       >
         {node.value.length > 48 ? node.value.slice(0, 45) + "…" : node.value}
       </div>
       {seen.length > 0 && (
-        <div className="flex items-center gap-1 mt-1">
+        <div className="flex items-center gap-1 mt-1 flex-wrap">
           {seen.map((s) => {
             const ToolIcon = iconForTool(s);
             return (
               <span
                 key={s}
-                className="hunt-chip"
+                className="h-chip"
                 style={{ padding: "0 3px", fontSize: "9px" }}
                 title={`observed by ${s}`}
               >
@@ -90,7 +81,7 @@ function nodeToRf(n: GNode): Node {
       background: "transparent",
       border: "none",
       padding: 0,
-      width: 200,
+      width: 220,
     },
   };
 }
@@ -106,23 +97,22 @@ function edgeToRf(e: GEdge, idx: number): Edge {
     className: cross ? "cross-source" : "",
     label: e.rule,
     labelStyle: {
-      fill: cross ? "#e2e8f0" : "#64748b",
-      fontFamily: "JetBrains Mono, monospace",
+      fill: cross ? "#b45309" : "#64748b",
+      fontFamily: "ui-monospace, monospace",
       fontSize: 9,
     },
     labelBgStyle: { fill: "#0b1018" },
     labelBgPadding: [2, 2],
     style: {
-      strokeWidth: cross ? 1.5 : 1.1,
+      strokeWidth: cross ? 1.4 : 1,
     },
   };
 }
 
 /**
- * Cheap deterministic layered layout. We do not want to ship dagre or
- * elk to keep the bundle small; the analyst's eye is on the *topology*
- * more than the precise coordinates. Nodes are arranged in a grid
- * keyed on (kind, then value hash).
+ * Deterministic layered layout. We avoid shipping dagre / elk to keep
+ * the bundle small; the analyst's eye is on the *topology* more than
+ * the precise coordinates.
  */
 function layoutNodes(nodes: GNode[]): Record<string, { x: number; y: number }> {
   const positions: Record<string, { x: number; y: number }> = {};
@@ -135,15 +125,17 @@ function layoutNodes(nodes: GNode[]): Record<string, { x: number; y: number }> {
     }
     byKind[n.kind].push(n);
   });
-  // Sort kinds so the most-connected ones float left.
   kindOrder.sort();
   let y = 0;
-  const COL_W = 240;
-  const ROW_H = 92;
+  const COL_W = 260;
+  const ROW_H = 96;
   kindOrder.forEach((kind) => {
     const group = byKind[kind].sort((a, b) => a.value.localeCompare(b.value));
     group.forEach((n, i) => {
-      positions[n.id] = { x: (i % 4) * COL_W, y: Math.floor(i / 4) * ROW_H + y };
+      positions[n.id] = {
+        x: (i % 4) * COL_W,
+        y: Math.floor(i / 4) * ROW_H + y,
+      };
     });
     y += Math.ceil(group.length / 4) * ROW_H + 24;
   });
@@ -184,17 +176,16 @@ export function CorrelationGraph() {
 
   if (ws.graph.nodes.length === 0) {
     return (
-      <div className="h-full w-full flex items-center justify-center bg-slate-950">
+      <div className="h-full w-full flex items-center justify-center bg-bg-base">
         <div className="text-center max-w-md px-6">
-          <div className="hunt-label mb-2">CORRELATION GRAPH</div>
-          <div className="font-mono text-xs text-slate-500">
-            NO DATA · execute a hunt to populate the entity graph.
+          <div className="h-label mb-2">correlation graph</div>
+          <div className="font-mono text-xs text-fg-dim">
+            no data · execute a hunt to populate the entity graph.
             <br />
             <br />
             nodes will appear once an investigation produces findings.
-            cross-source edges (different tools observing the same
-            entity) are drawn solid white; same-tool edges are dotted
-            slate.
+            cross-source edges (different tools observing the same entity)
+            are drawn in the accent color; same-tool edges are dim slate.
           </div>
         </div>
       </div>
@@ -202,7 +193,7 @@ export function CorrelationGraph() {
   }
 
   return (
-    <div className="h-full w-full bg-slate-950">
+    <div className="h-full w-full bg-bg-base">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -219,15 +210,14 @@ export function CorrelationGraph() {
         <Controls
           showInteractive={false}
           position="bottom-right"
-          style={{ background: "#0b1018", border: "1px solid #1e293b" }}
         />
         <MiniMap
           position="top-right"
           pannable
           zoomable
-          nodeColor={() => "#475569"}
+          nodeColor={() => "#27313f"}
           nodeStrokeColor={() => "#1e293b"}
-          maskColor="rgba(2, 6, 23, 0.7)"
+          maskColor="rgba(5, 8, 13, 0.8)"
         />
       </ReactFlow>
     </div>

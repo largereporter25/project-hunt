@@ -1,9 +1,18 @@
 /**
- * Forensic helpers used across the dashboard:
- *   * shortSha — first 12 hex chars of a SHA-256 (analyst-friendly)
- *   * fmtTs    — render an ISO timestamp as a terminal-style timestamp
- *   * detectKind — quick heuristic to pick a target kind before sending
- *   * iconForKind — map an entity kind to a Lucide icon name
+ * Forensic helpers used across the dashboard.
+ *
+ *   * shortSha   — first 12 hex chars of a SHA-256
+ *   * fmtTs      — render an ISO timestamp as a terminal timestamp
+ *   * detectKind — quick heuristic to pick a target kind
+ *   * iconForKind / iconForTool — entity / source icons
+ *   * kindTag    — short uppercase 3-letter label for an entity kind
+ *                  (single-color replacement for the old polychrome
+ *                  accentForKind that painted every kind a different
+ *                  color — that was a SaaS-tell)
+ *
+ * The color palette is intentionally tiny: every chip, border, and
+ * link in the app pulls from a single accent (amber) and a single
+ * fg/line stack. There is no per-kind color anywhere.
  */
 
 import {
@@ -23,8 +32,8 @@ import {
   Gavel,
   Quote,
   CircleHelp,
+  type LucideIcon,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import type { EntityKind } from "./types";
 
 export function shortSha(sha: string): string {
@@ -37,7 +46,6 @@ export function fmtTs(iso: string | null | undefined): string {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    // YYYY-MM-DD HH:MM:SSZ — terminal style, no locale string.
     const pad = (n: number) => String(n).padStart(2, "0");
     return (
       `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
@@ -83,6 +91,7 @@ export function iconForKind(kind: EntityKind): LucideIcon {
     case "phone":
       return Phone;
     case "person":
+    case "username":
       return User;
     case "org":
       return Building2;
@@ -105,8 +114,6 @@ export function iconForKind(kind: EntityKind): LucideIcon {
       return Gavel;
     case "claim":
       return Quote;
-    case "username":
-      return User;
     default:
       return CircleHelp;
   }
@@ -143,129 +150,51 @@ export function iconForTool(tool: string): LucideIcon {
   }
 }
 
-// Per-kind accent colors. The graph and the findings table use these to
-// make cross-source pivots visually pop. Keep the palette muted — this
-// is an analyst tool, not a marketing site.
-export function accentForKind(kind: EntityKind): {
-  text: string; // tailwind text-*
-  border: string; // tailwind border-*
-  bg: string; // tailwind bg-*
-  hex: string; // raw hex, useful for inline styles (reactflow, svg)
-} {
+/**
+ * Short uppercase 3-letter label for an entity kind. Replaces the old
+ * polychrome ``accentForKind`` that the rendering code used to color
+ * each kind differently — that produced the "rainbow card with
+ * colored left border" SaaS-tell. The kind tag is monochrome and
+ * is rendered as a small chip beside the value, the same way
+ * Wireshark labels a protocol column.
+ */
+export function kindTag(kind: EntityKind): string {
   switch (kind) {
     case "ipv4":
+      return "IPv4";
     case "ipv6":
-      return {
-        text: "text-amber-300",
-        border: "border-amber-700/50",
-        bg: "bg-amber-950/30",
-        hex: "#fbbf24",
-      };
-    case "domain":
-    case "subdomain":
-      return {
-        text: "text-indigo-300",
-        border: "border-indigo-700/50",
-        bg: "bg-indigo-950/30",
-        hex: "#a5b4fc",
-      };
+      return "IPv6";
     case "email":
-      return {
-        text: "text-rose-300",
-        border: "border-rose-700/50",
-        bg: "bg-rose-950/30",
-        hex: "#fda4af",
-      };
+      return "EML";
     case "phone":
-      return {
-        text: "text-orange-300",
-        border: "border-orange-700/50",
-        bg: "bg-orange-950/30",
-        hex: "#fdba74",
-      };
+      return "TEL";
     case "person":
-      return {
-        text: "text-emerald-300",
-        border: "border-emerald-700/50",
-        bg: "bg-emerald-950/30",
-        hex: "#6ee7b7",
-      };
-    case "org":
-      return {
-        text: "text-sky-300",
-        border: "border-sky-700/50",
-        bg: "bg-sky-950/30",
-        hex: "#7dd3fc",
-      };
-    case "cert":
-      return {
-        text: "text-purple-300",
-        border: "border-purple-700/50",
-        bg: "bg-purple-950/30",
-        hex: "#d8b4fe",
-      };
-    case "asn":
-      return {
-        text: "text-cyan-300",
-        border: "border-cyan-700/50",
-        bg: "bg-cyan-950/30",
-        hex: "#67e8f9",
-      };
-    case "url":
-      return {
-        text: "text-cyan-200",
-        border: "border-cyan-800/50",
-        bg: "bg-cyan-950/20",
-        hex: "#a5f3fc",
-      };
-    case "hash":
-      return {
-        text: "text-slate-300",
-        border: "border-slate-700/60",
-        bg: "bg-slate-900/40",
-        hex: "#cbd5e1",
-      };
-    case "breach":
-      return {
-        text: "text-rose-200",
-        border: "border-rose-800/60",
-        bg: "bg-rose-950/40",
-        hex: "#fecaca",
-      };
-    case "company_registration":
-      return {
-        text: "text-yellow-300",
-        border: "border-yellow-700/50",
-        bg: "bg-yellow-950/30",
-        hex: "#fde047",
-      };
-    case "court_case":
-      return {
-        text: "text-fuchsia-300",
-        border: "border-fuchsia-700/50",
-        bg: "bg-fuchsia-950/30",
-        hex: "#f0abfc",
-      };
-    case "claim":
-      return {
-        text: "text-teal-300",
-        border: "border-teal-700/50",
-        bg: "bg-teal-950/30",
-        hex: "#5eead4",
-      };
+      return "PER";
     case "username":
-      return {
-        text: "text-emerald-200",
-        border: "border-emerald-800/50",
-        bg: "bg-emerald-950/20",
-        hex: "#a7f3d0",
-      };
+      return "USR";
+    case "org":
+      return "ORG";
+    case "cert":
+      return "CRT";
+    case "asn":
+      return "ASN";
+    case "url":
+      return "URL";
+    case "hash":
+      return "HASH";
+    case "breach":
+      return "BRCH";
+    case "domain":
+      return "DOM";
+    case "subdomain":
+      return "SUB";
+    case "company_registration":
+      return "COREG";
+    case "court_case":
+      return "COURT";
+    case "claim":
+      return "CLM";
     default:
-      return {
-        text: "text-slate-300",
-        border: "border-slate-700/60",
-        bg: "bg-slate-900/40",
-        hex: "#94a3b8",
-      };
+      return "ENT";
   }
 }

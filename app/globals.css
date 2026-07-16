@@ -3,7 +3,10 @@
 @tailwind utilities;
 
 /* ------------------------------------------------------------------ */
-/* Forensic-terminal global styles. Forensically serious, data-dense.  */
+/* Project HUNT — forensic-terminal global styles.                    */
+/*                                                                     */
+/* One font. One accent. No shadows. No gradients. No glow.          */
+/* Borders are 1px slate, full stop.                                  */
 /* ------------------------------------------------------------------ */
 
 :root {
@@ -13,11 +16,11 @@
 html,
 body {
   height: 100%;
-  background-color: #05080d; /* slate-950 */
-  color: #cbd5e1;            /* slate-300 */
-  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    Roboto, sans-serif;
-  font-feature-settings: "ss01", "cv11";
+  background-color: #05080d; /* matches `bg.base` in tailwind config */
+  color: #cbd5e1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-feature-settings: "calt" 0; /* disable ligatures in monospace */
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
 }
@@ -26,37 +29,22 @@ body {
   box-sizing: border-box;
 }
 
-/* Selection: muted indigo, no glow. */
+/* Selection: monochrome accent, no glow. */
 ::selection {
-  background-color: #312e81;
-  color: #e0e7ff;
+  background-color: #7c2d12;
+  color: #fde68a;
 }
 
-/* Subtle background grid for the workstation canvas. Visible only on
-   the main graph/table area; 1px lines every 24px, 4% opacity. */
-.bg-grid {
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
-  background-size: 24px 24px;
+/* 1px focus outline. No glow, no box-shadow. */
+:focus {
+  outline: none;
 }
-
-/* Slow pulse for skeleton/loading blocks. */
-@keyframes pulse-slow {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.7; }
-}
-.animate-pulse-slow {
-  animation: pulse-slow 2.4s ease-in-out infinite;
-}
-
-/* No focus rings as glow — give every focusable element a 1px outline. */
 :focus-visible {
-  outline: 1px solid #475569; /* slate-600 */
+  outline: 1px solid #b45309;
   outline-offset: -1px;
 }
 
-/* Custom scrollbar: thin, monochrome, terminal. */
+/* Custom scrollbar: thin, monochrome, no rounded ends. */
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -72,55 +60,67 @@ body {
   background: #334155;
 }
 
-/* Reusable utility classes for the dashboard. */
+/* ------------------------------------------------------------------ */
+/* Reusable utility classes for the dashboard.                        */
+/* ------------------------------------------------------------------ */
+
 @layer components {
-  .hunt-panel {
-    @apply bg-panel-900 border border-slate-800;
+  .h-panel {
+    @apply bg-bg-panel border border-line;
   }
-  .hunt-row {
-    @apply border-b border-slate-800 hover:bg-panel-800;
+  .h-row {
+    @apply border-b border-line hover:bg-bg-row;
   }
-  .hunt-label {
-    @apply text-[10px] uppercase tracking-[0.18em] text-slate-500 font-medium;
+  .h-label {
+    @apply text-[10px] uppercase tracking-[0.18em] text-fg-dim;
   }
-  .hunt-mono {
-    @apply font-mono text-slate-300;
+  .h-mono {
+    @apply font-mono text-fg;
   }
-  .hunt-chip {
+  .h-chip {
     @apply inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px]
-           font-mono uppercase tracking-wider border border-slate-700
-           text-slate-400 bg-slate-900;
+           font-mono uppercase tracking-wider border border-line
+           text-fg-dim bg-bg-base;
   }
-  .hunt-chip-active {
-    @apply border-indigo-700/60 bg-indigo-950/50 text-indigo-200;
+  .h-chip-on {
+    @apply border-accent bg-bg-panel text-accent-bright;
   }
-  .hunt-chip-warn {
-    @apply border-rose-800/60 bg-rose-950/30 text-rose-300;
+  .h-chip-warn {
+    @apply border-err bg-bg-base text-err;
   }
-  .hunt-button {
+  .h-button {
     @apply inline-flex items-center gap-1.5 px-2 py-1 text-xs
-           bg-slate-800 border border-slate-700 text-slate-200
-           hover:bg-slate-700 hover:border-slate-600
+           bg-bg-panel border border-line text-fg
+           hover:border-fg-muted
            disabled:opacity-50 disabled:cursor-not-allowed
-           transition-colors;
+           transition-colors font-mono;
   }
-  .hunt-button-primary {
+  .h-button-primary {
     @apply inline-flex items-center gap-1.5 px-2 py-1 text-xs
-           bg-slate-200 border border-slate-300 text-slate-900
-           hover:bg-white
+           bg-accent border border-accent-bright text-fg-inverse
+           hover:bg-accent-bright
            disabled:opacity-50 disabled:cursor-not-allowed
-           transition-colors font-medium;
+           transition-colors font-mono font-semibold;
   }
-  .hunt-input {
-    @apply w-full bg-slate-950 border border-slate-800
-           text-slate-200 placeholder-slate-600
-           px-2 py-1.5 text-sm font-mono
-           focus:border-slate-600 focus:outline-none;
+  .h-input {
+    @apply w-full bg-bg-base border border-line
+           text-fg placeholder-fg-muted
+           px-2 py-1 text-sm font-mono
+           focus:border-accent focus:outline-none;
+  }
+  .h-divider {
+    @apply h-px bg-line w-full;
+  }
+  .h-key {
+    @apply inline-block px-1.5 py-px text-[10px] font-mono
+           border border-line bg-bg-base text-fg-dim;
   }
 }
 
-/* ReactFlow overrides — kill the default rounded look, force sharp 1px
-   borders and dim monochrome. */
+/* ------------------------------------------------------------------ */
+/* ReactFlow overrides — kill every default theme that screams SaaS.  */
+/* Force 1px borders, no rounded corners, single accent color.        */
+/* ------------------------------------------------------------------ */
 .react-flow {
   background-color: #05080d !important;
 }
@@ -128,34 +128,50 @@ body {
   display: none !important;
 }
 .react-flow__node {
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+}
+.react-flow__node.selected {
+  outline: 1px solid #b45309;
+  outline-offset: 0;
 }
 .react-flow__edge-path {
-  stroke-width: 1.2;
+  stroke: #475569;
+  stroke-width: 1;
 }
 .react-flow__edge.cross-source .react-flow__edge-path {
-  stroke: #e2e8f0;
-  stroke-width: 1.5;
+  stroke: #b45309;
+  stroke-width: 1.4;
 }
-.react-flow__edge:not(.cross-source) .react-flow__edge-path {
-  stroke: #475569;
-  stroke-dasharray: 3 3;
+.react-flow__edge-text {
+  fill: #94a3b8;
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+}
+.react-flow__edge-textbg {
+  fill: #0b1018;
 }
 .react-flow__handle {
-  background: #334155;
-  border: 1px solid #1e293b;
+  background: #27313f;
+  border: 1px solid #0b1018;
   width: 6px;
   height: 6px;
+  border-radius: 0;
 }
 .react-flow__controls {
   background: #0b1018;
   border: 1px solid #1e293b;
   box-shadow: none;
+  border-radius: 0;
 }
 .react-flow__controls-button {
   background: #0b1018;
   border-bottom: 1px solid #1e293b;
   color: #94a3b8;
+  border-radius: 0;
 }
 .react-flow__controls-button:hover {
   background: #1e293b;
@@ -164,21 +180,62 @@ body {
 .react-flow__minimap {
   background: #0b1018;
   border: 1px solid #1e293b;
+  border-radius: 0;
+}
+.react-flow__background {
+  background-color: #05080d;
 }
 
-/* Syntax-highlighted JSON. Monospaced only — no colour festival. */
+/* ------------------------------------------------------------------ */
+/* JSON in the evidence inspector: single color, no syntax rainbow.   */
+/* ------------------------------------------------------------------ */
+.jtok {
+  color: #cbd5e1;
+}
 .jtok-key {
-  color: #93c5fd; /* slate-300ish */
+  color: #cbd5e1;
 }
 .jtok-string {
   color: #cbd5e1;
 }
 .jtok-number {
-  color: #fcd34d;
+  color: #cbd5e1;
 }
 .jtok-bool {
-  color: #c4b5fd;
+  color: #cbd5e1;
 }
 .jtok-null {
-  color: #94a3b8;
+  color: #64748b;
+}
+
+/* ------------------------------------------------------------------ */
+/* Blinking caret (loading screen + status line)                      */
+/* ------------------------------------------------------------------ */
+@keyframes hunt-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+.hunt-blink {
+  animation: hunt-blink 1.1s steps(1, end) infinite;
+}
+
+/* Underline reveal (only animation we keep) — used to indicate a
+   state change without resorting to a spinner. */
+@keyframes hunt-step {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.hunt-step {
+  position: relative;
+  overflow: hidden;
+}
+.hunt-step::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 1px;
+  width: 30%;
+  background: #b45309;
+  animation: hunt-step 1.6s linear infinite;
 }

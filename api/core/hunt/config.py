@@ -27,10 +27,24 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Database. SQLite is the default for local dev and small Vercel
-    # projects; Postgres works for serious deployments. Vercel Postgres,
-    # Neon, and Supabase all expose ``postgresql+psycopg2://`` URLs.
+    # Database. SQLite is the default for local dev; Postgres is
+    # REQUIRED for the Vercel deployment (Vercel serverless functions
+    # have no writable filesystem, so SQLite would lose all data
+    # between invocations). Vercel Postgres, Neon, and Supabase all
+    # expose ``postgresql+psycopg2://`` URLs.
     database_url: str = "sqlite+pysqlite:///./hunt.db"
+
+    # ``VERCEL`` is set by the Vercel runtime. We branch on it in
+    # ``db.py`` to refuse to start without ``DATABASE_URL`` (a silent
+    # "in-memory SQLite per request" deployment would be a footgun:
+    # everything looks empty after a cold start).
+    @property
+    def vercel(self) -> bool:  # noqa: D401
+        import os
+
+        return bool(os.environ.get("VERCEL")) or bool(
+            os.environ.get("VERCEL_ENV")
+        )
 
     # App
     app_env: str = "dev"

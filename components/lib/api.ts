@@ -10,10 +10,12 @@
  *   /api/v1/stats         — GET   aggregate counters
  *
  * The browser reads the backend base URL from the build-time env var
- * ``NEXT_PUBLIC_API_URL``. In production (Vercel), set that to your
- * Railway/Render backend URL. In dev, leave it unset and the client
- * falls back to http://localhost:8000 so the local FastAPI process
- * still works without any env file.
+ * ``NEXT_PUBLIC_API_URL``:
+ *   * If set (e.g. local dev with ``NEXT_PUBLIC_API_URL=http://localhost:8000``),
+ *     the client uses that absolute origin.
+ *   * If unset (the default on Vercel), the client calls ``/api/v1/*``
+ *     on the **same origin** so the request hits the Python handler
+ *     Vercel runs from ``api/index.py``. No CORS, no proxy.
  *
  * Next.js inlines ``NEXT_PUBLIC_*`` at build time, so this constant
  * is a plain string in the browser bundle.
@@ -32,12 +34,14 @@ import type {
 
 const RAW_BASE =
   typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL
-    : "http://localhost:8000";
+    ? process.env.NEXT_PUBLIC_API_URL.trim()
+    : "";
 
-// Strip any trailing slash so concatenation is unambiguous, then
-// append the versioned API prefix exactly once.
-const BASE = `${RAW_BASE.replace(/\/+$/, "")}/api/v1`;
+// Empty base = same origin. Vercel routes ``/api/*`` to ``api/index.py``.
+// Non-empty base = absolute URL (local dev pointing at a separate uvicorn).
+const BASE = RAW_BASE
+  ? `${RAW_BASE.replace(/\/+$/, "")}/api/v1`
+  : "/api/v1";
 
 async function request<T>(
   path: string,
