@@ -67,10 +67,10 @@ let cached: Settings | null = null;
 export function getSettings(): Settings {
   if (cached) return cached;
 
-  const database_url = envStr(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/postgres"
-  );
+  // No default. If DATABASE_URL is missing/empty on Vercel we want
+  // the clean 503 from `lib/db.ts`, not a `pg` ECONNREFUSED 500.
+  // Local dev: set DATABASE_URL=postgresql://... in .env.
+  const database_url = envStr("DATABASE_URL", "");
   const is_vercel =
     Boolean(process.env.VERCEL) || Boolean(process.env.VERCEL_ENV);
   const is_postgres = database_url.startsWith("postgres");

@@ -4,12 +4,11 @@
  * Mirrors the Python `hunt()` function: validate body, narrow tools
  * by kind, insert an `investigations` row, run, ingest, return.
  *
- * Errors caught at the top level and turned into a 200 response
- * with `module_errors` filled in (so the UI shows "tool X failed"
- * rather than a 500). The single non-happy path is "DB not
- * configured" → 503.
- *
- * Same `HuntResponse` shape as the Python version.
+ * The whole handler is wrapped in a top-level try/catch. Any pg
+ * error (ECONNREFUSED, sslmode mismatch, auth, schema drift) is
+ * surfaced in the JSON body as 503 with `error: "database_error"`,
+ * never a bare 500 — the operator needs to see the real `pg` error
+ * without digging through Vercel logs.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -27,6 +26,27 @@ interface HuntBody {
   target?: string;
   kind?: string | null;
   modules?: string[] | null;
+}
+
+interface HuntResult {
+  investigation_id: string;
+  target: string;
+  kind: string | null;
+  findings: Array<{
+    source_tool: string;
+    entity_kind: string;
+    entity_value: string;
+    attributes: Record<string, unknown>;
+    evidence_id?: string;
+    payload_sha256?: string;
+    tsa_authority?: string | null;
+    tsa_stamped_at?: string | null;
+    tsa_trusted?: boolean;
+  }>;
+  modules_run: string[];
+  modules_skipped: string[];
+  module_errors: Record<string, string>;
+  duration_ms: number;
 }
 
 export async function POST(req: NextRequest) {
@@ -50,7 +70,8 @@ export async function POST(req: NextRequest) {
   const requestedModules = body.modules ?? null;
 
   try {
-    await ensureSchema();
+    const result = await runHunt(target, kind, requestedModules);
+    return NextResponse.json(result);
   } catch (e) {
     if (e instanceof DatabaseNotConfigured) {
       return NextResponse.json(
@@ -58,19 +79,26 @@ export async function POST(req: NextRequest) {
         { status: 503 }
       );
     }
-    throw e;
+    const message = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    return NextResponse.json(
+      { error: "database_error", detail: message },
+      { status: 503 }
+    );
   }
+}
 
+async function runHunt(
+  target: string,
+  kind: string | null,
+  requestedModules: string[] | null
+): Promise<HuntResult> {
   // Decide which tools to run.
   let tools = availableTools();
   if (requestedModules && requestedModules.length > 0) {
     const wanted = new Set(requestedModules.map((s) => s.toLowerCase()));
     tools = tools.filter((t) => wanted.has(t.name));
     if (tools.length === 0) {
-      return NextResponse.json(
-        { error: "no_matching_modules", detail: [...wanted].join(",") },
-        { status: 400 }
-      );
+      throw new Error(`no_matching_modules: ${[...wanted].join(",")}`);
     }
   } else if (kind) {
     const narrowed = tools.filter((t) => t.accepts.has(kind));
@@ -145,8 +173,8 @@ export async function POST(req: NextRequest) {
     );
   });
 
-  // 5) Build the response.
-  return NextResponse.json({
+  // 5) Build the result.
+  return {
     investigation_id: investigationId,
     target,
     kind,
@@ -165,5 +193,5 @@ export async function POST(req: NextRequest) {
     modules_skipped: [],
     module_errors: moduleErrors,
     duration_ms: durationMs,
-  });
+  };
 }
