@@ -3,8 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "project hunt // osint workstation",
-  description:
-    "Unified OSINT orchestration with cryptographic provenance and live entity correlation.",
+  description: "Unified OSINT orchestration with cryptographic provenance.",
 };
 
 export default function RootLayout({
@@ -14,9 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-bg-base text-fg antialiased">
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
